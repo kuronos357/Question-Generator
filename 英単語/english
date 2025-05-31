@@ -1,0 +1,1123 @@
+import React, { useState, useEffect } from 'react';
+import { Shuffle, RefreshCw, CheckCircle, XCircle, Trophy, BookOpen, Eye, EyeOff, Upload, Database } from 'lucide-react';
+
+const EnglishVocabQuiz = () => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [questions, setQuestions] = useState([]);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [quizComplete, setQuizComplete] = useState(false);
+  const [showEtymology, setShowEtymology] = useState(false);
+  const [vocabularyData, setVocabularyData] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // 語源データベース（主要な語根と接頭辞・接尾辞）
+  const etymologyDatabase = {
+    // 接頭辞
+    'ab-': '離れて、から',
+    'ac-': 'に向かって',
+    'ad-': 'に向かって',
+    'ambi-': '両方',
+    'ana-': '上に、再び',
+    'anti-': '反対の',
+    'auto-': '自己の',
+    'bi-': '2つの',
+    'co-': '共に',
+    'com-': '完全に',
+    'con-': '共に',
+    'de-': '下に、除去',
+    'dis-': '離れて、否定',
+    'ex-': '外に',
+    'in-': '中に、否定',
+    'inter-': '間の',
+    'pre-': '前の',
+    'pro-': '前に',
+    're-': '再び',
+    'sub-': '下に',
+    'super-': '上に',
+    'trans-': '横切って',
+    'un-': '否定',
+
+    // 語根
+    'act': '行動',
+    'duc': '導く',
+    'fac': '作る',
+    'form': '形',
+    'graph': '書く',
+    'log': '言葉',
+    'mit': '送る',
+    'port': '運ぶ',
+    'scrib': '書く',
+    'spec': '見る',
+    'struct': '建てる',
+    'tract': '引く',
+    'vert': '回る',
+    'vid': '見る',
+
+    // 接尾辞
+    '-able': 'できる',
+    '-ance': '状態',
+    '-ent': '～する',
+    '-er': '～する人',
+    '-ful': '満ちた',
+    '-ion': '動作・状態',
+    '-ity': '性質',
+    '-ive': '～の性質',
+    '-less': '～のない',
+    '-ment': '結果・手段',
+    '-ness': '状態',
+    '-ous': '～の性質'
+  };
+
+  // 語源を生成する関数
+  const generateEtymology = (word) => {
+    const etymologies = {
+      'important': 'ラテン語 importare (持ち込む) から。in- (中に) + portare (運ぶ) = 中に運び込む重要なもの',
+      'through': '古英語 thurh から。ゲルマン語族共通の語根で「貫通する」という意味',
+      'language': 'ラテン語 lingua (舌) から。フランス語を経て英語に。舌で話すもの = 言語',
+      'international': 'ラテン語 inter (間) + natio (国) + -al (形容詞語尾) = 国と国の間の',
+      'possible': 'ラテン語 posse (できる) から。pos- (力) + -ible (可能) = 力があってできる',
+      'distance': 'ラテン語 distantia から。dis- (離れて) + stare (立つ) = 離れて立つこと',
+      'result': 'ラテン語 resultare から。re- (戻って) + saltare (跳ぶ) = 跳ね返ってくるもの',
+      'remember': 'ラテン語 rememorari から。re- (再び) + memorari (記憶する) = 再び記憶に呼び起こす',
+      'behavior': 'be- (完全に) + have (持つ) + -ior (動作) = 完全に持っている動作・態度',
+      'environment': 'フランス語 environ (周囲) + -ment (状態) = 周囲の状態・環境',
+      'efficiency': 'ラテン語 efficere (達成する) から。ex- (外に) + facere (作る) = 外に作り出す効率性',
+      'physics': 'ギリシャ語 physikos (自然の) から。physis (自然) + -ics (学問) = 自然学',
+      'insight': 'in- (内に) + sight (見る) = 内を見通すこと、洞察',
+      'donate': 'ラテン語 donare (与える) から。donum (贈り物) + -ate (動詞語尾)',
+      'praise': '古フランス語 preisier から。ラテン語 pretium (価値) = 価値を認める',
+      'claim': 'ラテン語 clamare (叫ぶ) から。主張して叫ぶこと',
+      'motive': 'ラテン語 movere (動く) から。mot- (動く) + -ive (性質) = 動かす性質'
+    };
+
+    // 特定の単語の語源がある場合はそれを返す
+    if (etymologies[word.toLowerCase()]) {
+      return etymologies[word.toLowerCase()];
+    }
+
+    // 語根分析による自動生成
+    let etymology = '';
+    const lowerWord = word.toLowerCase();
+    
+    // 接頭辞チェック
+    for (const [prefix, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.startsWith(prefix.replace('-', '')) && prefix.endsWith('-')) {
+        etymology += `接頭辞 ${prefix} (${meaning}) + `;
+        break;
+      }
+    }
+
+    // 語根チェック
+    for (const [root, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.includes(root) && !root.includes('-')) {
+        etymology += `語根 ${root} (${meaning}) + `;
+        break;
+      }
+    }
+
+    // 接尾辞チェック
+    for (const [suffix, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.endsWith(suffix.replace('-', '')) && suffix.startsWith('-')) {
+        etymology += `接尾辞 ${suffix} (${meaning})`;
+        break;
+      }
+    }
+
+    return etymology || '語源情報を準備中です。一般的な英語の語源は、ラテン語、ゲルマン語、フランス語などに由来します。';
+  };
+
+  // CSVデータを読み込む関数
+  const loadCSVData = async () => {
+    setLoading(true);
+    try {
+      // CSVファイルを読み込み
+      const fileContent = await window.fs.readFile('英単語.csv', { encoding: 'utf8' });
+      
+      // Papaparseで解析
+      const Papa = await import('papaparse');
+      const parsedData = Papa.default.parse(fileContent, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        delimitersToGuess: [',', '\t', '|', ';']
+      });
+
+      // データをクリーンアップして変換
+      const validEntries = parsedData.data
+        .filter(row => 
+          row['英語'] && row['日本語'] && 
+          typeof row['英語'] === 'string' && 
+          typeof row['日本語'] === 'string' &&
+          row['英語'].trim() !== '' && 
+          row['日本語'].trim() !== ''
+        )
+        .map(row => {
+          const word = row['英語'].trim();
+          const meaning = row['日本語'].trim();
+          
+          // 日本語から品詞情報を除去（より純粋な意味を抽出）
+          const cleanMeaning = meaning
+            .replace(/\(.*?\)/g, '') // 括弧内を除去
+            .replace(/，[^，]*$/, '') // 最後のカンマ以降を除去（複数意味の場合は最初の意味を使用）
+            .trim();
+
+          return {
+            word: word,
+            meaning: cleanMeaning || meaning, // クリーンアップできない場合は元の意味を使用
+            etymology: generateEtymology(word),
+            synonyms: [], // CSVにはないのでとりあえず空配列
+            related: []   // CSVにはないのでとりあえず空配列
+          };
+        });
+
+      console.log(`${validEntries.length}個の単語を読み込みました`);
+      setVocabularyData(validEntries);
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('CSVファイルの読み込みに失敗しました:', error);
+      // フォールバック: デフォルトデータを使用
+      setVocabularyData(getDefaultVocabulary());
+      setDataLoaded(true);
+    }
+    setLoading(false);
+  };
+
+  // デフォルトの語彙データ（CSVが読み込めない場合のフォールバック）
+  const getDefaultVocabulary = () => [
+    { 
+      word: "important", 
+      meaning: "重要な", 
+      synonyms: ["significant", "crucial", "vital"], 
+      related: ["unimportant", "essential", "major"],
+      etymology: "ラテン語 importare (持ち込む) から。in- (中に) + portare (運ぶ) = 中に運び込む重要なもの"
+    },
+    { 
+      word: "through", 
+      meaning: "～を通って", 
+      synonyms: ["across", "via", "by way of"], 
+      related: ["around", "over", "past"],
+      etymology: "古英語 thurh から。ゲルマン語族共通の語根で「貫通する」という意味"
+    },
+    { 
+      word: "language", 
+      meaning: "言語", 
+      synonyms: ["tongue", "speech", "dialect"], 
+      related: ["communication", "words", "expression"],
+      etymology: "ラテン語 lingua (舌) から。フランス語を経て英語に。舌で話すもの = 言語"
+    }
+  ];
+
+  // 類義語ベースの選択肢生成関数
+  const generateOptions = (correctWord, vocabularyList) => {
+    const wordData = vocabularyList.find(item => item.word === correctWord);
+    if (!wordData) return [correctWord];
+    
+    const correctMeaning = wordData.meaning;
+    
+    // 他の単語から不正解選択肢を生成
+    const otherWords = vocabularyList.filter(item => item.word !== correctWord);
+    const wrongOptions = [];
+    
+    // 類似した意味の長さや文字を持つ選択肢を優先
+    const similarMeanings = otherWords
+      .filter(item => {
+        const lengthDiff = Math.abs(item.meaning.length - correctMeaning.length);
+        const hasCommonChar = item.meaning.split('').some(char => correctMeaning.includes(char));
+        return lengthDiff <= 3 || hasCommonChar; // 似た長さまたは共通文字がある
+      })
+      .map(item => item.meaning);
+    
+    // ランダムな選択肢も追加
+    const randomMeanings = otherWords
+      .map(item => item.meaning)
+      .filter(meaning => meaning !== correctMeaning);
+    
+    // 選択肢を組み合わせてシャッフル
+    const allWrongOptions = [...similarMeanings, ...randomMeanings];
+    const uniqueWrongOptions = [...new Set(allWrongOptions)];
+    const shuffledWrong = uniqueWrongOptions.sort(() => Math.random() - 0.5);
+    
+    // 3つの不正解選択肢を選択
+    wrongOptions.push(...shuffledWrong.slice(0, 3));
+    
+    // 足りない場合は残りから追加
+    while (wrongOptions.length < 3 && randomMeanings.length > wrongOptions.length) {
+      const remaining = randomMeanings.filter(m => !wrongOptions.includes(m));
+      if (remaining.length > 0) {
+        wrongOptions.push(remaining[Math.floor(Math.random() * remaining.length)]);
+      } else {
+        break;
+      }
+    }
+    
+    // 正解を含めた4つの選択肢をシャッフル
+    const allOptions = [correctMeaning, ...wrongOptions.slice(0, 3)];
+    return allOptions.sort(() => Math.random() - 0.5);
+  };
+
+  // クイズ問題を生成
+  const generateQuestions = (numQuestions = 10) => {
+    if (vocabularyData.length === 0) return [];
+    
+    const shuffledVocab = [...vocabularyData].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffledVocab.slice(0, Math.min(numQuestions, vocabularyData.length));
+    
+    return selectedWords.map(wordData => ({
+      word: wordData.word,
+      correctAnswer: wordData.meaning,
+      options: generateOptions(wordData.word, vocabularyData),
+      etymology: wordData.etymology
+    }));
+  };
+
+  // ゲーム開始
+  const startQuiz = () => {
+    if (vocabularyData.length === 0) {
+      alert('単語データがまだ読み込まれていません。しばらくお待ちください。');
+      return;
+    }
+    
+    const newQuestions = generateQuestions(10);
+    setQuestions(newQuestions);
+    setCurrentQuestion(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setGameStarted(true);
+    setQuizComplete(false);
+    setShowEtymology(false);
+  };
+
+  // 答えを選択
+  const selectAnswer = (answer) => {
+    if (showResult) return;
+    setSelectedAnswer(answer);
+    setShowResult(true);
+    
+    if (answer === questions[currentQuestion].correctAnswer) {
+      setScore(score + 1);
+    }
+  };
+
+  // 次の問題へ
+  const nextQuestion = () => {
+    if (currentQuestion + 1 < questions.length) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setShowResult(false);
+      setShowEtymology(false);
+    } else {
+      setQuizComplete(true);
+    }
+  };
+
+  // スコアに基づく評価
+  const getScoreMessage = () => {
+    const percentage = (score / questions.length) * 100;
+    if (percentage >= 90) return "素晴らしい！完璧に近い成績です！";
+    if (percentage >= 80) return "とても良くできました！";
+    if (percentage >= 70) return "良い成績です！";
+    if (percentage >= 60) return "もう少し頑張りましょう。";
+    return "復習が必要ですね。頑張りましょう！";
+  };
+
+  // コンポーネントマウント時にCSVデータを読み込み
+  useEffect(() => {
+    loadCSVData();
+  }, []);
+
+  // データ読み込み中の画面
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Database className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">データを読み込み中...</h2>
+          <p className="text-gray-600 mb-4">2691語の英単語データを準備しています</p>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // メニュー画面
+  if (!gameStarted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">英単語クイズ</h1>
+            <p className="text-gray-600">大学受験レベルの英単語を4択で学習</p>
+          </div>
+          
+          <div className="mb-8">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-center mb-2">
+                <Database className="w-5 h-5 text-green-600 mr-2" />
+                <span className="font-semibold text-green-800">データ読み込み完了</span>
+              </div>
+              <p className="text-sm text-green-700">
+                {vocabularyData.length}語の英単語を読み込みました
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-blue-800 mb-2">クイズの特徴</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• CSVファイルから実際の単語を出題</li>
+                <li>• 語源解説付きで深く学習</li>
+                <li>• 類義語を考慮した4択問題</li>
+                <li>• 全10問のチャレンジ</li>
+              </ul>
+            </div>
+          </div>
+          
+          <button
+            onClick={startQuiz}
+            disabled={vocabularyData.length === 0}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+          >
+            <Shuffle className="w-5 h-5" />
+            <span>クイズを始める</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 結果画面
+  if (quizComplete) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <Trophy className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">クイズ完了！</h2>
+          </div>
+          
+          <div className="mb-6">
+            <div className="text-4xl font-bold text-blue-600 mb-2">
+              {score}/{questions.length}
+            </div>
+            <div className="text-xl text-gray-600 mb-4">
+              正答率: {Math.round((score / questions.length) * 100)}%
+            </div>
+            <p className="text-gray-700">{getScoreMessage()}</p>
+          </div>
+          
+          <div className="space-y-3">
+            <button
+              onClick={startQuiz}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              <span>もう一度挑戦</span>
+            </button>
+            
+            <button
+              onClick={() => setGameStarted(false)}
+              className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+            >
+              メニューに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentQ = questions[currentQuestion];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* ヘッダー */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-800">英単語クイズ</h1>
+            <div className="text-lg font-semibold text-blue-600">
+              {currentQuestion + 1}/{questions.length}
+            </div>
+          </div>
+          
+          {/* プログレスバー */}
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{width: `${((currentQuestion + 1) / questions.length) * 100}%`}}
+            ></div>
+          </div>
+          
+          <div className="text-right text-sm text-gray-600">
+            スコア: {score}/{currentQuestion + (showResult ? 1 : 0)}
+          </div>
+        </div>
+
+        {/* 問題 */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+          <div className="text-center mb-8">
+            <h2 className="text-lg text-gray-600 mb-4">次の英単語の意味を選んでください</h2>
+            <div className="text-4xl font-bold text-gray-800 mb-2">
+              {currentQ.word}
+            </div>
+          </div>
+
+          {/* 選択肢 */}
+          <div className="space-y-3">
+            {currentQ.options.map((option, index) => {
+              let buttonClass = "w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ";
+              
+              if (!showResult) {
+                buttonClass += selectedAnswer === option 
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100";
+              } else {
+                if (option === currentQ.correctAnswer) {
+                  buttonClass += "border-green-500 bg-green-50 text-green-700";
+                } else if (option === selectedAnswer && option !== currentQ.correctAnswer) {
+                  buttonClass += "border-red-500 bg-red-50 text-red-700";
+                } else {
+                  buttonClass += "border-gray-200 bg-gray-50 text-gray-500";
+                }
+              }
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => selectAnswer(option)}
+                  className={buttonClass}
+                  disabled={showResult}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg">{option}</span>
+                    {showResult && option === currentQ.correctAnswer && (
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    )}
+                    {showResult && option === selectedAnswer && option !== currentQ.correctAnswer && (
+                      <XCircle className="w-6 h-6 text-red-600" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 結果表示と次へボタン */}
+          {showResult && (
+            <div className="mt-6 text-center">
+              <div className="mb-4">
+                {selectedAnswer === currentQ.correctAnswer ? (
+                  <div className="text-green-600 font-semibold text-lg">正解！</div>
+                ) : (
+                  <div className="text-red-600 font-semibold text-lg">
+                    不正解 - 正解は「{currentQ.correctAnswer}」です
+                  </div>
+                )}
+              </div>
+
+              {/* 語源表示ボタンとエリア */}
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowEtymology(!showEtymology)}
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 mx-auto mb-3"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>語源を{showEtymology ? '隠す' : '表示'}</span>
+                  {showEtymology ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                
+                {showEtymology && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left">
+                    <h4 className="font-semibold text-purple-800 mb-2 flex items-center">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      語源解説: {currentQ.word}
+                    </h4>
+                    <p className="text-purple-700 text-sm leading-relaxed">
+                      {currentQ.etymology}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <button
+                onClick={nextQuestion}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
+              >
+                {currentQuestion + 1 < questions.length ? "次の問題" : "結果を見る"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EnglishVocabQuiz;import React, { useState, useEffect } from 'react';
+import { Shuffle, RefreshCw, CheckCircle, XCircle, Trophy, BookOpen, Eye, EyeOff, Upload, Database } from 'lucide-react';
+
+const EnglishVocabQuiz = () => {
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [selectedAnswer, setSelectedAnswer] = useState(null);
+  const [showResult, setShowResult] = useState(false);
+  const [score, setScore] = useState(0);
+  const [questions, setQuestions] = useState([]);
+  const [gameStarted, setGameStarted] = useState(false);
+  const [quizComplete, setQuizComplete] = useState(false);
+  const [showEtymology, setShowEtymology] = useState(false);
+  const [vocabularyData, setVocabularyData] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  // 語源データベース（主要な語根と接頭辞・接尾辞）
+  const etymologyDatabase = {
+    // 接頭辞
+    'ab-': '離れて、から',
+    'ac-': 'に向かって',
+    'ad-': 'に向かって',
+    'ambi-': '両方',
+    'ana-': '上に、再び',
+    'anti-': '反対の',
+    'auto-': '自己の',
+    'bi-': '2つの',
+    'co-': '共に',
+    'com-': '完全に',
+    'con-': '共に',
+    'de-': '下に、除去',
+    'dis-': '離れて、否定',
+    'ex-': '外に',
+    'in-': '中に、否定',
+    'inter-': '間の',
+    'pre-': '前の',
+    'pro-': '前に',
+    're-': '再び',
+    'sub-': '下に',
+    'super-': '上に',
+    'trans-': '横切って',
+    'un-': '否定',
+
+    // 語根
+    'act': '行動',
+    'duc': '導く',
+    'fac': '作る',
+    'form': '形',
+    'graph': '書く',
+    'log': '言葉',
+    'mit': '送る',
+    'port': '運ぶ',
+    'scrib': '書く',
+    'spec': '見る',
+    'struct': '建てる',
+    'tract': '引く',
+    'vert': '回る',
+    'vid': '見る',
+
+    // 接尾辞
+    '-able': 'できる',
+    '-ance': '状態',
+    '-ent': '～する',
+    '-er': '～する人',
+    '-ful': '満ちた',
+    '-ion': '動作・状態',
+    '-ity': '性質',
+    '-ive': '～の性質',
+    '-less': '～のない',
+    '-ment': '結果・手段',
+    '-ness': '状態',
+    '-ous': '～の性質'
+  };
+
+  // 語源を生成する関数
+  const generateEtymology = (word) => {
+    const etymologies = {
+      'important': 'ラテン語 importare (持ち込む) から。in- (中に) + portare (運ぶ) = 中に運び込む重要なもの',
+      'through': '古英語 thurh から。ゲルマン語族共通の語根で「貫通する」という意味',
+      'language': 'ラテン語 lingua (舌) から。フランス語を経て英語に。舌で話すもの = 言語',
+      'international': 'ラテン語 inter (間) + natio (国) + -al (形容詞語尾) = 国と国の間の',
+      'possible': 'ラテン語 posse (できる) から。pos- (力) + -ible (可能) = 力があってできる',
+      'distance': 'ラテン語 distantia から。dis- (離れて) + stare (立つ) = 離れて立つこと',
+      'result': 'ラテン語 resultare から。re- (戻って) + saltare (跳ぶ) = 跳ね返ってくるもの',
+      'remember': 'ラテン語 rememorari から。re- (再び) + memorari (記憶する) = 再び記憶に呼び起こす',
+      'behavior': 'be- (完全に) + have (持つ) + -ior (動作) = 完全に持っている動作・態度',
+      'environment': 'フランス語 environ (周囲) + -ment (状態) = 周囲の状態・環境',
+      'efficiency': 'ラテン語 efficere (達成する) から。ex- (外に) + facere (作る) = 外に作り出す効率性',
+      'physics': 'ギリシャ語 physikos (自然の) から。physis (自然) + -ics (学問) = 自然学',
+      'insight': 'in- (内に) + sight (見る) = 内を見通すこと、洞察',
+      'donate': 'ラテン語 donare (与える) から。donum (贈り物) + -ate (動詞語尾)',
+      'praise': '古フランス語 preisier から。ラテン語 pretium (価値) = 価値を認める',
+      'claim': 'ラテン語 clamare (叫ぶ) から。主張して叫ぶこと',
+      'motive': 'ラテン語 movere (動く) から。mot- (動く) + -ive (性質) = 動かす性質'
+    };
+
+    // 特定の単語の語源がある場合はそれを返す
+    if (etymologies[word.toLowerCase()]) {
+      return etymologies[word.toLowerCase()];
+    }
+
+    // 語根分析による自動生成
+    let etymology = '';
+    const lowerWord = word.toLowerCase();
+    
+    // 接頭辞チェック
+    for (const [prefix, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.startsWith(prefix.replace('-', '')) && prefix.endsWith('-')) {
+        etymology += `接頭辞 ${prefix} (${meaning}) + `;
+        break;
+      }
+    }
+
+    // 語根チェック
+    for (const [root, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.includes(root) && !root.includes('-')) {
+        etymology += `語根 ${root} (${meaning}) + `;
+        break;
+      }
+    }
+
+    // 接尾辞チェック
+    for (const [suffix, meaning] of Object.entries(etymologyDatabase)) {
+      if (lowerWord.endsWith(suffix.replace('-', '')) && suffix.startsWith('-')) {
+        etymology += `接尾辞 ${suffix} (${meaning})`;
+        break;
+      }
+    }
+
+    return etymology || '語源情報を準備中です。一般的な英語の語源は、ラテン語、ゲルマン語、フランス語などに由来します。';
+  };
+
+  // CSVデータを読み込む関数
+  const loadCSVData = async () => {
+    setLoading(true);
+    try {
+      // CSVファイルを読み込み
+      const fileContent = await window.fs.readFile('英単語.csv', { encoding: 'utf8' });
+      
+      // Papaparseで解析
+      const Papa = await import('papaparse');
+      const parsedData = Papa.default.parse(fileContent, {
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        delimitersToGuess: [',', '\t', '|', ';']
+      });
+
+      // データをクリーンアップして変換
+      const validEntries = parsedData.data
+        .filter(row => 
+          row['英語'] && row['日本語'] && 
+          typeof row['英語'] === 'string' && 
+          typeof row['日本語'] === 'string' &&
+          row['英語'].trim() !== '' && 
+          row['日本語'].trim() !== ''
+        )
+        .map(row => {
+          const word = row['英語'].trim();
+          const meaning = row['日本語'].trim();
+          
+          // 日本語から品詞情報を除去（より純粋な意味を抽出）
+          const cleanMeaning = meaning
+            .replace(/\(.*?\)/g, '') // 括弧内を除去
+            .replace(/，[^，]*$/, '') // 最後のカンマ以降を除去（複数意味の場合は最初の意味を使用）
+            .trim();
+
+          return {
+            word: word,
+            meaning: cleanMeaning || meaning, // クリーンアップできない場合は元の意味を使用
+            etymology: generateEtymology(word),
+            synonyms: [], // CSVにはないのでとりあえず空配列
+            related: []   // CSVにはないのでとりあえず空配列
+          };
+        });
+
+      console.log(`${validEntries.length}個の単語を読み込みました`);
+      setVocabularyData(validEntries);
+      setDataLoaded(true);
+    } catch (error) {
+      console.error('CSVファイルの読み込みに失敗しました:', error);
+      // フォールバック: デフォルトデータを使用
+      setVocabularyData(getDefaultVocabulary());
+      setDataLoaded(true);
+    }
+    setLoading(false);
+  };
+
+  // デフォルトの語彙データ（CSVが読み込めない場合のフォールバック）
+  const getDefaultVocabulary = () => [
+    { 
+      word: "important", 
+      meaning: "重要な", 
+      synonyms: ["significant", "crucial", "vital"], 
+      related: ["unimportant", "essential", "major"],
+      etymology: "ラテン語 importare (持ち込む) から。in- (中に) + portare (運ぶ) = 中に運び込む重要なもの"
+    },
+    { 
+      word: "through", 
+      meaning: "～を通って", 
+      synonyms: ["across", "via", "by way of"], 
+      related: ["around", "over", "past"],
+      etymology: "古英語 thurh から。ゲルマン語族共通の語根で「貫通する」という意味"
+    },
+    { 
+      word: "language", 
+      meaning: "言語", 
+      synonyms: ["tongue", "speech", "dialect"], 
+      related: ["communication", "words", "expression"],
+      etymology: "ラテン語 lingua (舌) から。フランス語を経て英語に。舌で話すもの = 言語"
+    }
+  ];
+
+  // 類義語ベースの選択肢生成関数
+  const generateOptions = (correctWord, vocabularyList) => {
+    const wordData = vocabularyList.find(item => item.word === correctWord);
+    if (!wordData) return [correctWord];
+    
+    const correctMeaning = wordData.meaning;
+    
+    // 他の単語から不正解選択肢を生成
+    const otherWords = vocabularyList.filter(item => item.word !== correctWord);
+    const wrongOptions = [];
+    
+    // 類似した意味の長さや文字を持つ選択肢を優先
+    const similarMeanings = otherWords
+      .filter(item => {
+        const lengthDiff = Math.abs(item.meaning.length - correctMeaning.length);
+        const hasCommonChar = item.meaning.split('').some(char => correctMeaning.includes(char));
+        return lengthDiff <= 3 || hasCommonChar; // 似た長さまたは共通文字がある
+      })
+      .map(item => item.meaning);
+    
+    // ランダムな選択肢も追加
+    const randomMeanings = otherWords
+      .map(item => item.meaning)
+      .filter(meaning => meaning !== correctMeaning);
+    
+    // 選択肢を組み合わせてシャッフル
+    const allWrongOptions = [...similarMeanings, ...randomMeanings];
+    const uniqueWrongOptions = [...new Set(allWrongOptions)];
+    const shuffledWrong = uniqueWrongOptions.sort(() => Math.random() - 0.5);
+    
+    // 3つの不正解選択肢を選択
+    wrongOptions.push(...shuffledWrong.slice(0, 3));
+    
+    // 足りない場合は残りから追加
+    while (wrongOptions.length < 3 && randomMeanings.length > wrongOptions.length) {
+      const remaining = randomMeanings.filter(m => !wrongOptions.includes(m));
+      if (remaining.length > 0) {
+        wrongOptions.push(remaining[Math.floor(Math.random() * remaining.length)]);
+      } else {
+        break;
+      }
+    }
+    
+    // 正解を含めた4つの選択肢をシャッフル
+    const allOptions = [correctMeaning, ...wrongOptions.slice(0, 3)];
+    return allOptions.sort(() => Math.random() - 0.5);
+  };
+
+  // クイズ問題を生成
+  const generateQuestions = (numQuestions = 10) => {
+    if (vocabularyData.length === 0) return [];
+    
+    const shuffledVocab = [...vocabularyData].sort(() => Math.random() - 0.5);
+    const selectedWords = shuffledVocab.slice(0, Math.min(numQuestions, vocabularyData.length));
+    
+    return selectedWords.map(wordData => ({
+      word: wordData.word,
+      correctAnswer: wordData.meaning,
+      options: generateOptions(wordData.word, vocabularyData),
+      etymology: wordData.etymology
+    }));
+  };
+
+  // ゲーム開始
+  const startQuiz = () => {
+    if (vocabularyData.length === 0) {
+      alert('単語データがまだ読み込まれていません。しばらくお待ちください。');
+      return;
+    }
+    
+    const newQuestions = generateQuestions(10);
+    setQuestions(newQuestions);
+    setCurrentQuestion(0);
+    setScore(0);
+    setSelectedAnswer(null);
+    setShowResult(false);
+    setGameStarted(true);
+    setQuizComplete(false);
+    setShowEtymology(false);
+  };
+
+  // 答えを選択
+  const selectAnswer = (answer) => {
+    if (showResult) return;
+    setSelectedAnswer(answer);
+    setShowResult(true);
+    
+    if (answer === questions[currentQuestion].correctAnswer) {
+      setScore(score + 1);
+    }
+  };
+
+  // 次の問題へ
+  const nextQuestion = () => {
+    if (currentQuestion + 1 < questions.length) {
+      setCurrentQuestion(currentQuestion + 1);
+      setSelectedAnswer(null);
+      setShowResult(false);
+      setShowEtymology(false);
+    } else {
+      setQuizComplete(true);
+    }
+  };
+
+  // スコアに基づく評価
+  const getScoreMessage = () => {
+    const percentage = (score / questions.length) * 100;
+    if (percentage >= 90) return "素晴らしい！完璧に近い成績です！";
+    if (percentage >= 80) return "とても良くできました！";
+    if (percentage >= 70) return "良い成績です！";
+    if (percentage >= 60) return "もう少し頑張りましょう。";
+    return "復習が必要ですね。頑張りましょう！";
+  };
+
+  // コンポーネントマウント時にCSVデータを読み込み
+  useEffect(() => {
+    loadCSVData();
+  }, []);
+
+  // データ読み込み中の画面
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <Database className="w-16 h-16 text-blue-500 mx-auto mb-4 animate-pulse" />
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">データを読み込み中...</h2>
+          <p className="text-gray-600 mb-4">2691語の英単語データを準備しています</p>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full animate-pulse" style={{width: '60%'}}></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // メニュー画面
+  if (!gameStarted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">英単語クイズ</h1>
+            <p className="text-gray-600">大学受験レベルの英単語を4択で学習</p>
+          </div>
+          
+          <div className="mb-8">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              <div className="flex items-center justify-center mb-2">
+                <Database className="w-5 h-5 text-green-600 mr-2" />
+                <span className="font-semibold text-green-800">データ読み込み完了</span>
+              </div>
+              <p className="text-sm text-green-700">
+                {vocabularyData.length}語の英単語を読み込みました
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-4 mb-4">
+              <h3 className="font-semibold text-blue-800 mb-2">クイズの特徴</h3>
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>• CSVファイルから実際の単語を出題</li>
+                <li>• 語源解説付きで深く学習</li>
+                <li>• 類義語を考慮した4択問題</li>
+                <li>• 全10問のチャレンジ</li>
+              </ul>
+            </div>
+          </div>
+          
+          <button
+            onClick={startQuiz}
+            disabled={vocabularyData.length === 0}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+          >
+            <Shuffle className="w-5 h-5" />
+            <span>クイズを始める</span>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // 結果画面
+  if (quizComplete) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mb-6">
+            <Trophy className="w-16 h-16 text-yellow-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">クイズ完了！</h2>
+          </div>
+          
+          <div className="mb-6">
+            <div className="text-4xl font-bold text-blue-600 mb-2">
+              {score}/{questions.length}
+            </div>
+            <div className="text-xl text-gray-600 mb-4">
+              正答率: {Math.round((score / questions.length) * 100)}%
+            </div>
+            <p className="text-gray-700">{getScoreMessage()}</p>
+          </div>
+          
+          <div className="space-y-3">
+            <button
+              onClick={startQuiz}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2"
+            >
+              <RefreshCw className="w-5 h-5" />
+              <span>もう一度挑戦</span>
+            </button>
+            
+            <button
+              onClick={() => setGameStarted(false)}
+              className="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-200"
+            >
+              メニューに戻る
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const currentQ = questions[currentQuestion];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-100 p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* ヘッダー */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-800">英単語クイズ</h1>
+            <div className="text-lg font-semibold text-blue-600">
+              {currentQuestion + 1}/{questions.length}
+            </div>
+          </div>
+          
+          {/* プログレスバー */}
+          <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{width: `${((currentQuestion + 1) / questions.length) * 100}%`}}
+            ></div>
+          </div>
+          
+          <div className="text-right text-sm text-gray-600">
+            スコア: {score}/{currentQuestion + (showResult ? 1 : 0)}
+          </div>
+        </div>
+
+        {/* 問題 */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
+          <div className="text-center mb-8">
+            <h2 className="text-lg text-gray-600 mb-4">次の英単語の意味を選んでください</h2>
+            <div className="text-4xl font-bold text-gray-800 mb-2">
+              {currentQ.word}
+            </div>
+          </div>
+
+          {/* 選択肢 */}
+          <div className="space-y-3">
+            {currentQ.options.map((option, index) => {
+              let buttonClass = "w-full p-4 text-left rounded-lg border-2 transition-all duration-200 ";
+              
+              if (!showResult) {
+                buttonClass += selectedAnswer === option 
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 bg-gray-50 hover:border-gray-300 hover:bg-gray-100";
+              } else {
+                if (option === currentQ.correctAnswer) {
+                  buttonClass += "border-green-500 bg-green-50 text-green-700";
+                } else if (option === selectedAnswer && option !== currentQ.correctAnswer) {
+                  buttonClass += "border-red-500 bg-red-50 text-red-700";
+                } else {
+                  buttonClass += "border-gray-200 bg-gray-50 text-gray-500";
+                }
+              }
+
+              return (
+                <button
+                  key={index}
+                  onClick={() => selectAnswer(option)}
+                  className={buttonClass}
+                  disabled={showResult}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-lg">{option}</span>
+                    {showResult && option === currentQ.correctAnswer && (
+                      <CheckCircle className="w-6 h-6 text-green-600" />
+                    )}
+                    {showResult && option === selectedAnswer && option !== currentQ.correctAnswer && (
+                      <XCircle className="w-6 h-6 text-red-600" />
+                    )}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 結果表示と次へボタン */}
+          {showResult && (
+            <div className="mt-6 text-center">
+              <div className="mb-4">
+                {selectedAnswer === currentQ.correctAnswer ? (
+                  <div className="text-green-600 font-semibold text-lg">正解！</div>
+                ) : (
+                  <div className="text-red-600 font-semibold text-lg">
+                    不正解 - 正解は「{currentQ.correctAnswer}」です
+                  </div>
+                )}
+              </div>
+
+              {/* 語源表示ボタンとエリア */}
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowEtymology(!showEtymology)}
+                  className="bg-purple-100 hover:bg-purple-200 text-purple-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-2 mx-auto mb-3"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>語源を{showEtymology ? '隠す' : '表示'}</span>
+                  {showEtymology ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+                
+                {showEtymology && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-left">
+                    <h4 className="font-semibold text-purple-800 mb-2 flex items-center">
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      語源解説: {currentQ.word}
+                    </h4>
+                    <p className="text-purple-700 text-sm leading-relaxed">
+                      {currentQ.etymology}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              <button
+                onClick={nextQuestion}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-lg transition-colors duration-200"
+              >
+                {currentQuestion + 1 < questions.length ? "次の問題" : "結果を見る"}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default EnglishVocabQuiz;
