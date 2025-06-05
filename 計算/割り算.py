@@ -6,7 +6,6 @@ import tkinter as tk
 from tkinter import messagebox
 import os
 from notion_client import Client
-import json
 
 # Tkinterウィンドウを非表示にしておく
 root = tk.Tk()
@@ -19,14 +18,8 @@ DATABASE_ID = '10f5e314fd47808384fdfb936d00001b'
 new_row_id = None
 new_database_id = None
 
-log_file=("python/問題生成/ログ/log.json")
-debug=False
 totalNumber = 0
 Question = []
-json_data=[]
-
-
-
 
 url = 'https://api.notion.com/v1/pages'
 url_create_db = 'https://api.notion.com/v1/databases'
@@ -36,6 +29,7 @@ headers = {
     'Authorization': 'Bearer ' + NOTION_API_KEY,
     'Content-Type': 'application/json',
 }
+
 
 def custom_keypad_dialog(title, question):
     answer = []
@@ -137,6 +131,94 @@ def custom_keypad_dialog(title, question):
     return user_input, user_remainder
 
 
+def generate_and_add_random_int():
+    global new_row_id 
+    global totalNumber
+
+    count = 10
+    i = 0
+    n = 3
+    execution_time = []
+
+    while i < count:
+        X = []
+        correct_answer = []
+
+        for k in range(n):
+            X.append(random.randint(1, 9))
+            correct_answer.append(random.randint(1, 9))
+        
+        X = int(''.join(map(str, X)))
+        correct_answer = int(''.join(map(str, correct_answer)))
+        R= random.randint(0, X - 1)
+        Y = X * correct_answer + R # 余りを含む計算
+
+        print(X, Y, i, totalNumber)
+        start_time = time.time()
+
+        question = f"残り問題数：{count-i}問題: {Y} ÷ {X} = ?"
+        user_answer, user_remainder = custom_keypad_dialog("問題", question)
+
+        if user_answer is None or user_answer == '' or user_remainder is None or user_remainder == '':
+            messagebox.showinfo("結果", "キャンセルされました。")
+            return
+        
+        
+        end_time = time.time()
+        execution_time.append(end_time - start_time)
+
+        if int(correct_answer) == int(user_answer) and int(R) == int(user_remainder):
+            messagebox.showinfo("結果", f"正解 {execution_time[totalNumber]}秒")
+            judge = "正答"
+            i += 1
+        else:
+            messagebox.showinfo("結果", f"不正解！正解は 商: {correct_answer}, 余り: {R} \n{execution_time[totalNumber]}秒")
+            judge = "誤答"
+            i -= 1
+
+        
+        Question.append([f'{X} ÷ {Y}\n', correct_answer, user_answer, R, user_remainder, float(execution_time[totalNumber]), judge])
+        print(Question[totalNumber],'\n')
+        totalNumber += 1
+
+    json_data = {
+        'parent': {'database_id': DATABASE_ID},
+        'properties': {
+            '名前': {
+                'title': [{'text': {'content': str(datetime.now())}}]
+            },
+            '経過時間': {
+                'number': sum(execution_time)
+            },
+            "正答率": {
+                "number": 0.5 + (count / 2 / totalNumber)
+            },
+            "問題数": {
+                "number": totalNumber
+            },
+            "問題種":{
+                "select":{ 
+                    "name":"割り算"
+                }
+            }
+        }
+    }
+    response = requests.post(url, headers=headers, json=json_data)
+    
+    if response.status_code == 200:
+        print("新しい行が正常に追加されました。")
+        new_row_id = response.json()['id']
+        print(f"追加された行のID: {new_row_id}")
+        create_database_in_row()
+    else:
+        print(f"エラーが発生しました: {response.status_code} - {response.text}")
+        return None
+
+    average_time = sum(execution_time) / len(execution_time)
+    messagebox.showinfo("結果", f"日付: {current_date}, 平均時間: {average_time:.6f} 秒")
+    print(f"日付: {current_date}, 平均時間: {average_time:.6f} 秒, 正答率：{0.5 + count / 2 / totalNumber}")
+
+
 def create_database_in_row():
     global new_row_id, new_database_id
 
@@ -144,7 +226,7 @@ def create_database_in_row():
         print("エラー: 子ページIDが設定されていません。")
         return
 
-    json_data[1][0] = {
+    database_data = {
         "parent": {"page_id": new_row_id},
         "title": [{"type": "text", "text": {"content": "個別の問題"}}],
         "properties": {
@@ -164,159 +246,52 @@ def create_database_in_row():
         }
     }
 
-    response = requests.post(url_create_db, headers=headers, json=json_data[1][0])
+    response = requests.post(url_create_db, headers=headers, json=database_data)
 
     if response.status_code == 200:
         print("データベースが正常に作成されました。")
         new_database_id = response.json()['id']
         print(f"作成されたデータベースのID: {new_database_id}")
-        
     else:
         print(f"エラーが発生しました: {response.status_code} - {response.text}")
-
-def generate_and_add_random_int():
-    count = 10
-    i = 0
-    n = 3
-    execution_time = []
-    type="割り算"
-    done_time=datetime.now()
-
-    while i < count:#出題フロー
-        totalNumber += 1
-        X = []
-        correct_answer = []
-
-        for k in range(n):
-            X.append(random.randint(1, 9))
-            correct_answer.append(random.randint(1, 9))
-        
-        X = int(''.join(map(str, X)))
-        correct_answer = int(''.join(map(str, correct_answer)))
-        R= random.randint(0, X - 1)
-        Y = X * correct_answer + R # 余りを含む計算
-
-        print(X, Y, i, totalNumber)
-        start_time = time.time()
-
-        if debug:
-            type="デバッグ用"
-            print(correct_answer,R,"答え、デバッグ用")
-
-        question = f"残り問題数：{count-i}問題: {Y} ÷ {X} = ?"
-        user_answer, user_remainder = custom_keypad_dialog("問題", question)
-
-        if user_answer is None or user_answer == '' or user_remainder is None or user_remainder == '':
-            messagebox.showinfo("結果", "キャンセルされました。")
-            return
-        
-        
-        end_time = time.time()
-        execution_time.append(end_time - start_time)
-
-        if int(correct_answer) == int(user_answer) and int(R) == int(user_remainder) or debug:
-            messagebox.showinfo("結果", f"正解 {execution_time[totalNumber]}秒")
-            judge = "正答"
-            i += 1
-        else:
-            messagebox.showinfo("結果", f"不正解！正解は 商: {correct_answer}, 余り: {R} \n{execution_time[totalNumber]}秒")
-            judge = "誤答"
-            i -= 1
-
-        
-        Question.append([
-            f'{X} ÷ {Y}\n',
-            correct_answer, 
-            user_answer,
-            R,
-            user_remainder, 
-            float(execution_time[totalNumber]), 
-            judge
-        ])
-        print(Question[totalNumber],'\n')
-        json_data[1][totalNumber] = {
-            'parent': {'database_id': new_database_id},
-            'properties': {
-                "問題番号": {
-                    'title': [{'text': {'content': str(totalNumber)}}]
-                },
-                '問題': {
-                    'rich_text': [{'text': {'content': str(Question[totalNumber][0])}}]
-                },
-                '正答': {
-                    "number": float(Question[totalNumber][1])
-                },
-                '回答': {
-                    "number": float(Question[totalNumber][2])
-                },
-                "時間": {
-                    "number": float(Question[totalNumber][3])
-                },
-                "正誤判定": {
-                    "select": {"name": str(Question[totalNumber][4])}
-                },
-            }
-        }
-
-    json_data[0] = {
-        'parent': {'database_id': DATABASE_ID},
-        'properties': {
-            '名前': {
-                'title': [{'text': {'content': done_time}}]
-            },
-            '経過時間': {
-                'number': sum(execution_time)
-            },
-            "正答率": {
-                "number": 0.5 + (count / 2 / totalNumber)
-            },
-            "問題数": {
-                "number": totalNumber
-            },
-            "問題種":{
-                "select":{ 
-                    "name": type
-                }
-            }
-        }
-    }
-
-    print(done_time)
-    with open(log_file, 'r', encoding='utf-8') as file:
-        logdata = json.load(file)
-        
-    logdata[f"{done_time}"]=json_data
-    with open(log_file, 'w', encoding='utf-8') as file:
-        json.dump(logdata, file, indent=4, ensure_ascii=False)
-
-    
-    response = requests.post(url, headers=headers, json=json_data[0])
-    
-    if response.status_code == 200:
-        print("新しい行が正常に追加されました。")
-        new_row_id = response.json()['id']
-        print(f"追加された行のID: {new_row_id}")
-        create_database_in_row()
-        logdata[f"{done_time}"]=None
-    else:
-        print(f"エラーが発生しました: {response.status_code} - {response.text}")
-        return None
-
-    average_time = sum(execution_time) / len(execution_time)
-    messagebox.showinfo("結果", f"日付: {current_date}, 平均時間: {average_time:.6f} 秒")
-    print(f"日付: {current_date}, 平均時間: {average_time:.6f} 秒, 正答率：{0.5 + count / 2 / totalNumber}")
 
 
 def repeated_task(k):
     global new_database_id
     print(k,"番目のデータを書きこみ")
-    response = requests.post(url, headers=headers, json=json_data[1][k])
+
+    json_data = {
+        'parent': {'database_id': new_database_id},
+        'properties': {
+            "問題番号": {
+                'title': [{'text': {'content': str(k)}}]
+            },
+            '問題': {
+                'rich_text': [{'text': {'content': str(Question[k][0])}}]
+            },
+            '正答': {
+                "number": float(Question[k][1])
+            },
+            '回答': {
+                "number": float(Question[k][2])
+            },
+            "時間": {
+                "number": float(Question[k][5])
+            },
+            "正誤判定": {
+                "select": {"name": str(Question[k][6])}
+            },
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=json_data)
     print(Question[k],k,"番目のデータを書きこみ完了")
+
 
 # メイン処理
 generate_and_add_random_int()
 
-for k in range(totalNumber):#個別の問題の書き込み
+for k in range(totalNumber):
     
     repeated_task(k)
 
