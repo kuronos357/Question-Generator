@@ -419,13 +419,13 @@ def generate_and_process_quiz():
     correct_rate = len([q for q in Question if q['judge'] == '正解']) / len(Question)
     
     # 1. バッファ（JSON）に保存
-    print("\n=== バッファ保存フェーズ ===")
+    print("\n=== バッファ保存 ===")
     if not save_to_buffer(done_time, session_data):
         messagebox.showerror("エラー", "バッファ保存に失敗しました")
         return
     
     # 2. バッファ内の全データをNotionにアップロード
-    print("\n=== Notionアップロードフェーズ ===")
+    print("\n=== Notionアップロード ===")
     upload_success = upload_all_from_buffer()
     
     # 3. 結果表示
