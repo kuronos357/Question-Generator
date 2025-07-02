@@ -10,7 +10,7 @@ import json
 # 設定
 NOTION_API_KEY = 'secret_MBZIR3ot9FCM0oZycKCpb2TKB5pyZuIOtZGL2rEhvSM'
 DATABASE_ID = '10f5e314fd47808384fdfb936d00001b'
-LOG_FILE = "python/問題生成/計算/ログ/log.json"
+LOG_FILE = "Project/問題生成/計算/ログ/log.json"
 DEBUG = False
 
 # Notion API設定
