@@ -1,3 +1,5 @@
+
+
 import random
 import requests
 import time
@@ -7,31 +9,43 @@ from tkinter import messagebox
 import os
 import json
 
-# 設定
-NOTION_API_KEY = 'secret_MBZIR3ot9FCM0oZycKCpb2TKB5pyZuIOtZGL2rEhvSM'
-DATABASE_ID = '10f5e314fd47808384fdfb936d00001b'
-LOG_FILE = "Project/問題生成/計算/ログ/log.json"
-DEBUG = False
-
-# Notion API設定
-HEADERS = {
-    'Notion-Version': '2022-06-28',
-    'Authorization': f'Bearer {NOTION_API_KEY}',
-    'Content-Type': 'application/json',
-}
-URL_PAGES = 'https://api.notion.com/v1/pages'
-URL_DATABASE = 'https://api.notion.com/v1/databases'
-
 class QuizApp:
-    def __init__(self):
+    def __init__(self, config):
+        self.config = config
         self.root = tk.Tk()
         self.root.withdraw()
         self.questions = []
-        
+        self.question_type = self.select_question_type()
+
+    def select_question_type(self):
+        """GUI to select question type."""
+        selection = tk.StringVar()
+
+        def on_select():
+            top.destroy()
+
+        top = tk.Toplevel(self.root)
+        top.title("問題種別選択")
+        top.geometry("300x200")
+        top.attributes('-topmost', True)
+
+        tk.Label(top, text="どちらの問題を出題しますか？", font=('Helvetica', 14)).pack(pady=20)
+
+        if self.config.get("generate_multiplication"):
+            tk.Radiobutton(top, text="掛け算", variable=selection, value="multiplication", font=('Helvetica', 12)).pack(anchor=tk.W)
+        if self.config.get("generate_division"):
+            tk.Radiobutton(top, text="割り算", variable=selection, value="division", font=('Helvetica', 12)).pack(anchor=tk.W)
+
+        tk.Button(top, text="決定", command=on_select, font=('Helvetica', 12)).pack(pady=20)
+
+        top.grab_set()
+        self.root.wait_window(top)
+        return selection.get()
+
     def safe_int(self, value):
         """安全な整数変換"""
         return int(value) if value and value.isdigit() else 0
-    
+
     def calculate_stats(self):
         """統計情報を計算"""
         if not self.questions:
@@ -73,12 +87,12 @@ class QuizApp:
         def on_submit():
             nonlocal user_input, user_remainder
             user_input = ''.join(answer)
-            user_remainder = ''.join(remainder)
+            if self.question_type == 'division':
+                user_remainder = ''.join(remainder)
             keypad.destroy()
 
         keypad = tk.Toplevel()
         keypad.title(title)
-        keypad.geometry('600x700')
         keypad.attributes('-topmost', True)
 
         # UI要素
@@ -86,12 +100,18 @@ class QuizApp:
         
         entry_var = tk.StringVar()
         tk.Entry(keypad, textvariable=entry_var, font=('Helvetica', 18), justify='right').pack(pady=10)
-        tk.Button(keypad, text="商を入力", command=lambda: entry_focus.set("answer"), font=('Helvetica', 12)).pack(pady=5)
-        
-        tk.Label(keypad, text="余り:", font=('Helvetica', 14)).pack(pady=5)
-        remainder_var = tk.StringVar()
-        tk.Entry(keypad, textvariable=remainder_var, font=('Helvetica', 18), justify='right').pack(pady=10)
-        tk.Button(keypad, text="余りを入力", command=lambda: entry_focus.set("remainder"), font=('Helvetica', 12)).pack(pady=5)
+
+        if self.question_type == 'division':
+            keypad.geometry('600x700')
+            tk.Button(keypad, text="商を入力", command=lambda: entry_focus.set("answer"), font=('Helvetica', 12)).pack(pady=5)
+            
+            tk.Label(keypad, text="余り:", font=('Helvetica', 14)).pack(pady=5)
+            remainder_var = tk.StringVar()
+            tk.Entry(keypad, textvariable=remainder_var, font=('Helvetica', 18), justify='right').pack(pady=10)
+            tk.Button(keypad, text="余りを入力", command=lambda: entry_focus.set("remainder"), font=('Helvetica', 12)).pack(pady=5)
+        else:
+            keypad.geometry('500x600')
+
 
         # キーパッド
         btn_frame = tk.Frame(keypad)
@@ -118,26 +138,28 @@ class QuizApp:
 
         keypad.grab_set()
         self.root.wait_window(keypad)
-        return user_input, user_remainder
+        return user_input, user_remainder if self.question_type == 'division' else user_input
+
 
     def file_operation(self, operation, data=None):
         """ファイル操作の統一処理"""
+        log_file = "Project/問題生成/計算/ログ/log.json"
         try:
             if operation == 'load':
-                if os.path.exists(LOG_FILE):
-                    with open(LOG_FILE, 'r', encoding='utf-8') as file:
+                if os.path.exists(log_file):
+                    with open(log_file, 'r', encoding='utf-8') as file:
                         return json.load(file)
                 return {}
             
             elif operation == 'save':
-                os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
-                with open(LOG_FILE, 'w', encoding='utf-8') as file:
+                os.makedirs(os.path.dirname(log_file), exist_ok=True)
+                with open(log_file, 'w', encoding='utf-8') as file:
                     json.dump(data, file, indent=4, ensure_ascii=False)
                 return True
             
             elif operation == 'delete':
-                if os.path.exists(LOG_FILE):
-                    os.remove(LOG_FILE)
+                if os.path.exists(log_file):
+                    os.remove(log_file)
                 return True
                 
         except Exception as e:
@@ -146,8 +168,13 @@ class QuizApp:
 
     def notion_request(self, url, data):
         """Notion API リクエストの統一処理"""
+        headers = {
+            'Notion-Version': '2022-06-28',
+            'Authorization': f'Bearer {self.config["notion_api_key"]}',
+            'Content-Type': 'application/json',
+        }
         try:
-            response = requests.post(url, headers=HEADERS, json=data)
+            response = requests.post(url, headers=headers, json=data)
             if response.status_code == 200:
                 return response.json()
             else:
@@ -159,39 +186,42 @@ class QuizApp:
 
     def create_database(self, parent_page_id):
         """子データベース作成"""
-        database_data = {
-            "parent": {"page_id": parent_page_id},
-            "title": [{"type": "text", "text": {"content": "個別の問題"}}],
-            "properties": {
+        properties = {
                 "問題番号": {"title": {}},
                 "問題": {"rich_text": {}},
                 "正答": {"number": {"format": "number"}},
                 "回答": {"number": {"format": "number"}},
-                "余り正答": {"number": {"format": "number"}},
-                "余り回答": {"number": {"format": "number"}},
                 "時間": {"number": {"format": "number"}},
                 "正誤判定": {
                     "select": {
                         "options": [
                             {"name": "正解", "color": "green"},
-                            {"name": "誤解", "color": "red"},
+                            {"name": "誤解", "color": "red"}
                         ]
                     }
-                },
+                }
             }
+        if self.question_type == 'division':
+            properties["余り正答"] = {"number": {"format": "number"}}
+            properties["余り回答"] = {"number": {"format": "number"}}
+
+        database_data = {
+            "parent": {"page_id": parent_page_id},
+            "title": [{"type": "text", "text": {"content": "個別の問題"}}],
+            "properties": properties
         }
         
-        result = self.notion_request(URL_DATABASE, database_data)
+        result = self.notion_request('https://api.notion.com/v1/databases', database_data)
         return result['id'] if result else None
 
     def build_session_data(self, session_key):
         """セッションデータ構築"""
         avg_time, correct_rate, total_time = self.calculate_stats()
-        type_name = "デバッグ用" if DEBUG else "割り算"
+        type_name = "掛け算" if self.question_type == "multiplication" else "割り算"
         
         # メインページデータ
         main_page = {
-            'parent': {'database_id': DATABASE_ID},
+            'parent': {'database_id': self.config["notion_db_id"]},
             'properties': {
                 '名前': {'title': [{'text': {'content': session_key}}]},
                 '経過時間': {'number': total_time},
@@ -211,12 +241,13 @@ class QuizApp:
                     '問題': {'rich_text': [{'text': {'content': q['question']}}]},
                     '正答': {"number": q['correct_answer']},
                     '回答': {"number": q['user_answer']},
-                    '余り正答': {"number": q['correct_remainder']},
-                    '余り回答': {"number": q['user_remainder']},
                     "時間": {"number": q['time']},
-                    "正誤判定": {"select": {"name": q['judge']}},
+                    "正誤判定": {"select": {"name": q['judge']}}
                 }
             }
+            if self.question_type == 'division':
+                question_data['properties']['余り正答'] = {"number": q['correct_remainder']}
+                question_data['properties']['余り回答'] = {"number": q['user_remainder']}
             questions.append(question_data)
         
         return {'main_page': main_page, 'questions': questions}
@@ -224,7 +255,7 @@ class QuizApp:
     def upload_session(self, session_data):
         """単一セッションをNotionにアップロード"""
         # メインページ作成
-        main_page_result = self.notion_request(URL_PAGES, session_data['main_page'])
+        main_page_result = self.notion_request('https://api.notion.com/v1/pages', session_data['main_page'])
         if not main_page_result:
             return False
         
@@ -236,7 +267,7 @@ class QuizApp:
         # 個別問題をアップロード
         for question_data in session_data['questions']:
             question_data['parent']['database_id'] = database_id
-            if not self.notion_request(URL_PAGES, question_data):
+            if not self.notion_request('https://api.notion.com/v1/pages', question_data):
                 return False
         
         return True
@@ -261,8 +292,7 @@ class QuizApp:
                 print(f"✗ 失敗: {session_key}")
         
         # 成功したセッションを削除
-        for session_key in uploaded_sessions:
-            del buffer_data[session_key]
+        buffer_data = {k: v for k, v in buffer_data.items() if k not in uploaded_sessions}
         
         # バッファ更新
         if buffer_data:
@@ -271,68 +301,86 @@ class QuizApp:
             self.file_operation('delete')
             print("バッファファイルを削除しました")
         
-        success_rate = len(uploaded_sessions) / len(buffer_data) if buffer_data else 1
-        print(f"アップロード結果: {len(uploaded_sessions)}/{len(buffer_data)} セッション ({success_rate:.1%})")
+        success_rate = len(uploaded_sessions) / (len(buffer_data) + len(uploaded_sessions)) if (len(buffer_data) + len(uploaded_sessions)) > 0 else 1
+        print(f"アップロード結果: {len(uploaded_sessions)}/{len(buffer_data) + len(uploaded_sessions)} セッション ({success_rate:.1%})")
         
-        return len(buffer_data) == len(uploaded_sessions)
+        return not buffer_data
 
-    def generate_problems(self, count=10, digits=3):
+    def generate_problems(self):
         """問題生成・実行"""
         self.questions = []
         i = 0
+        count = self.config.get("initial_problem_count", 10)
         
         while i < count:
-            # 問題生成
-            X = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
-            correct_answer = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
-            R = random.randint(0, X - 1)
-            Y = X * correct_answer + R
+            if self.question_type == 'multiplication':
+                X = random.randint(10, 99)
+                Y = random.randint(10, 99)
+                correct_answer = X * Y
+                question_text = f"{X} × {Y} = ?"
+                user_input = self.custom_keypad_dialog("掛け算問題", f"残り問題数：{count-i}問題: {question_text}")
+                user_answer, _ = user_input
+            elif self.question_type == 'division':
+                digits = 3
+                X = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
+                correct_answer = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
+                R = random.randint(0, X - 1)
+                Y = X * correct_answer + R
+                question_text = f"{Y} ÷ {X} = ?"
+                user_answer, user_remainder = self.custom_keypad_dialog("割り算問題", f"残り問題数：{count-i}問題: {question_text}")
 
             start_time = time.time()
-            
-            if DEBUG:
-                print(f"デバッグ: 商={correct_answer}, 余り={R}")
 
-            question = f"残り問題数：{count-i}問題: {Y} ÷ {X} = ?"
-            user_answer, user_remainder = self.custom_keypad_dialog("問題", question)
-
-            if not user_answer or not user_remainder:
+            if not user_answer:
                 messagebox.showinfo("結果", "キャンセルされました。")
                 return None
             
             elapsed_time = time.time() - start_time
             
             # 正誤判定
-            is_correct = (int(correct_answer) == self.safe_int(user_answer) and 
-                         int(R) == self.safe_int(user_remainder)) or DEBUG
-            
-            judge = "正解" if is_correct else "誤解"
-            result_msg = f"{judge} {elapsed_time:.2f}秒"
-            
-            if not is_correct:
-                result_msg += f"\n正解: 商={correct_answer}, 余り={R}"
-            
+            if self.question_type == 'multiplication':
+                is_correct = (int(correct_answer) == self.safe_int(user_answer))
+                judge = "正解" if is_correct else "誤解"
+                result_msg = f"{judge} {elapsed_time:.2f}秒"
+                if not is_correct:
+                    result_msg += f"\n正解: {correct_answer}"
+            else: # division
+                is_correct = (int(correct_answer) == self.safe_int(user_answer) and int(R) == self.safe_int(user_remainder))
+                judge = "正解" if is_correct else "誤解"
+                result_msg = f"{judge} {elapsed_time:.2f}秒"
+                if not is_correct:
+                    result_msg += f"\n正解: 商={correct_answer}, 余り={R}"
+
             messagebox.showinfo("結果", result_msg)
             
             # 問題データ保存
-            self.questions.append({
-                'question': f'{Y} ÷ {X}',
+            q_data = {
+                'question': question_text,
                 'correct_answer': correct_answer,
                 'user_answer': self.safe_int(user_answer),
-                'correct_remainder': R,
-                'user_remainder': self.safe_int(user_remainder),
                 'time': elapsed_time,
                 'judge': judge
-            })
+            }
+            if self.question_type == 'division':
+                q_data['correct_remainder'] = R
+                q_data['user_remainder'] = self.safe_int(user_remainder)
+            self.questions.append(q_data)
             
             if is_correct:
                 i += 1
-        
+            elif self.config.get("increase_on_mistake"):
+                count += 1
+
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     def run(self):
         """メイン実行"""
-        print("=== 計算問題アプリ開始 ===")
+        if not self.question_type:
+            print("問題種別が選択されませんでした。")
+            self.root.destroy()
+            return
+
+        print(f"=== {self.question_type}問題アプリ開始 ===")
         
         # 1. 問題実行
         session_key = self.generate_problems()
@@ -374,7 +422,40 @@ class QuizApp:
         self.root.destroy()
 
 def main():
-    app = QuizApp()
+    config_path = '/home/kuronos357/programming/Project/問題生成/設定・ログ/config.json'
+    
+    # 設定ファイル読み込み
+    try:
+        if not os.path.exists(config_path):
+            print(f"設定ファイル '{config_path}' が見つかりません。")
+            os.makedirs(os.path.dirname(config_path), exist_ok=True)
+            
+            default_config = {
+                "generate_division": True,
+                "generate_multiplication": True,
+                "initial_problem_count": 20,
+                "increase_on_mistake": True,
+                "notion_api_key": "YOUR_NOTION_API_KEY_HERE",
+                "notion_db_id": "YOUR_NOTION_DATABASE_ID_HERE"
+            }
+            
+            with open(config_path, 'w', encoding='utf-8') as f:
+                json.dump(default_config, f, indent=4, ensure_ascii=False)
+            
+            print(f"デフォルト設定ファイルを '{config_path}' に作成しました。")
+            config = default_config
+        else:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+
+    except json.JSONDecodeError:
+        print(f"設定ファイル '{config_path}' の形式が正しくありません。")
+        return
+    except Exception as e:
+        print(f"設定ファイルの読み込み中にエラーが発生しました: {e}")
+        return
+
+    app = QuizApp(config)
     app.run()
 
 if __name__ == "__main__":
