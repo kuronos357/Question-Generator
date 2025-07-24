@@ -15,32 +15,17 @@ class QuizApp:
         self.root = tk.Tk()
         self.root.withdraw()
         self.questions = []
-        self.question_type = self.select_question_type()
+        self.question_type = self.get_question_type_from_config()
 
-    def select_question_type(self):
-        """GUI to select question type."""
-        selection = tk.StringVar()
-
-        def on_select():
-            top.destroy()
-
-        top = tk.Toplevel(self.root)
-        top.title("問題種別選択")
-        top.geometry("300x200")
-        top.attributes('-topmost', True)
-
-        tk.Label(top, text="どちらの問題を出題しますか？", font=('Helvetica', 14)).pack(pady=20)
-
-        if self.config.get("generate_multiplication"):
-            tk.Radiobutton(top, text="掛け算", variable=selection, value="multiplication", font=('Helvetica', 12)).pack(anchor=tk.W)
-        if self.config.get("generate_division"):
-            tk.Radiobutton(top, text="割り算", variable=selection, value="division", font=('Helvetica', 12)).pack(anchor=tk.W)
-
-        tk.Button(top, text="決定", command=on_select, font=('Helvetica', 12)).pack(pady=20)
-
-        top.grab_set()
-        self.root.wait_window(top)
-        return selection.get()
+    def get_question_type_from_config(self):
+        mode = self.config.get("mode", 0)  # Default to multiplication
+        if mode == 0:
+            return "multiplication"
+        elif mode == 1:
+            return "division"
+        else:
+            # Handle invalid mode if necessary
+            return "multiplication"
 
     def safe_int(self, value):
         """安全な整数変換"""
@@ -143,7 +128,7 @@ class QuizApp:
 
     def file_operation(self, operation, data=None):
         """ファイル操作の統一処理"""
-        log_file = "Project/問題生成/計算/ログ/log.json"
+        log_file = self.config.get("log_file_path", "Project/問題生成/計算/ログ/log.json")
         try:
             if operation == 'load':
                 if os.path.exists(log_file):
@@ -313,19 +298,27 @@ class QuizApp:
         count = self.config.get("initial_problem_count", 10)
         
         while i < count:
+
+            X = []
+            Y = []
+
+            for k in range(i):
+                X.append(random.randint(1, 9))
+                Y.append(random.randint(1, 9))
+            
+
+            print(X, Y, i)
+            start_time = time.time()
+
             if self.question_type == 'multiplication':
-                X = random.randint(10, 99)
-                Y = random.randint(10, 99)
+                
                 correct_answer = X * Y
                 question_text = f"{X} × {Y} = ?"
                 user_input = self.custom_keypad_dialog("掛け算問題", f"残り問題数：{count-i}問題: {question_text}")
                 user_answer, _ = user_input
             elif self.question_type == 'division':
-                digits = 3
-                X = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
-                correct_answer = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
                 R = random.randint(0, X - 1)
-                Y = X * correct_answer + R
+                correct_answer = X * Y + R
                 question_text = f"{Y} ÷ {X} = ?"
                 user_answer, user_remainder = self.custom_keypad_dialog("割り算問題", f"残り問題数：{count-i}問題: {question_text}")
 
@@ -375,11 +368,6 @@ class QuizApp:
 
     def run(self):
         """メイン実行"""
-        if not self.question_type:
-            print("問題種別が選択されませんでした。")
-            self.root.destroy()
-            return
-
         print(f"=== {self.question_type}問題アプリ開始 ===")
         
         # 1. 問題実行
@@ -404,7 +392,11 @@ class QuizApp:
         
         # 3. バッファ処理
         print("\n=== Notionアップロード ===")
-        upload_success = self.process_buffer()
+        if self.config.get("upload_to_notion", True):
+            upload_success = self.process_buffer()
+        else:
+            print("Notionへのアップロードは無効化されています。")
+            upload_success = True
         
         # 4. 結果表示
         avg_time, correct_rate, _ = self.calculate_stats()
@@ -431,12 +423,13 @@ def main():
             os.makedirs(os.path.dirname(config_path), exist_ok=True)
             
             default_config = {
-                "generate_division": True,
-                "generate_multiplication": True,
+                "mode": 0,
                 "initial_problem_count": 20,
                 "increase_on_mistake": True,
                 "notion_api_key": "YOUR_NOTION_API_KEY_HERE",
-                "notion_db_id": "YOUR_NOTION_DATABASE_ID_HERE"
+                "notion_db_id": "YOUR_NOTION_DATABASE_ID_HERE",
+                "upload_to_notion": True,
+                "log_file_path": "設定・ログ/log.json"
             }
             
             with open(config_path, 'w', encoding='utf-8') as f:
