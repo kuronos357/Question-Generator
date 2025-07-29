@@ -285,17 +285,21 @@ class MultiplicationQuizApp:
             if DEBUG:
                 print(f"デバッグ: {X,Y,Z, count-i,QUESTION_TYPE}問題")
 
-            question = f"残り問題数：{count-i}問題: {X} × {Y} = ?"
-            user_answer = self.custom_keypad_dialog("掛け算問題", question)
+            if QUESTION_TYPE == "掛け算":
+                question = f"残り問題数：{count-i}問題: {X} × {Y} + {R} = ?"
+                user_answer = self.custom_keypad_dialog("掛け算問題", question)
+                # 正誤判定
+                is_correct = (int(Z) == self.safe_int(user_answer)) or DEBUG
 
-            if not user_answer:
-                messagebox.showinfo("結果", "キャンセルされました。")
-                return None
-            
+            elif QUESTION_TYPE == "割り算":
+                question = f"残り問題数：{count-i}問題: {Z} ÷ {X} = ?余り?)"
+                user_answer = self.custom_keypad_dialog("割り算問題", question)
+                # 正誤判定
+                is_correct = (int(Z) == self.safe_int(user_answer)) and (int(R) == self.safe_int(user_answer)) or DEBUG
+
             elapsed_time = time.time() - start_time
             
-            # 正誤判定
-            is_correct = (int(Z) == self.safe_int(user_answer)) or DEBUG
+            
             
             judge = "正解" if is_correct else "誤解"
             result_msg = f"{judge} {elapsed_time:.2f}秒"
@@ -307,7 +311,7 @@ class MultiplicationQuizApp:
             
             # 問題データ保存
             self.questions.append({
-                'question': f'{X} × {Y}',
+                'question': f'{X} × {Y}+ {R}',
                 'Z': Z,
                 'user_answer': self.safe_int(user_answer),
                 'time': elapsed_time,
@@ -322,6 +326,13 @@ class MultiplicationQuizApp:
     def run(self):
         """メイン実行"""
         print("=== 計算問題アプリ開始 ===")
+        if DEBUG:
+            print("デバッグモード: 有効")
+            print(f"問題種: {QUESTION_TYPE}")
+            print(f"ログファイル: {LOG_FILE}")
+            print(f"Notion APIキー: {NOTION_API_KEY}")
+            print(f"データベースID: {DATABASE_ID}")
+            print("設定ファイル:", config_path)
         
         # 1. 問題実行
         session_key = self.generate_problems()
