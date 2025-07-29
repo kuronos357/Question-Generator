@@ -17,10 +17,11 @@ with open(config_path, 'r', encoding='utf-8') as f:
 
 NOTION_API_KEY = config['NOTION_API_KEY']
 DATABASE_ID = config['DATABASE_ID']
-DEBUG = config['DEBUG']
-QUESTION_TYPE = config['TYPE']
-# ログファイルのパスを絶対パスに変換
-LOG_FILE = os.path.join(os.path.dirname(config_path), config['LOG_FILE'])
+DEBUG = config.get('DEBUG', False)
+QUESTION_TYPE = config.get('TYPE', '掛け算')
+LOG_FILE = os.path.join(os.path.dirname(config_path), config.get('LOG_FILE', 'activity_log.json'))
+NUM_DIGITS = config.get('NUM_DIGITS', 3)
+ADD_QUESTIONS_ON_MISTAKE = config.get('ADD_QUESTIONS_ON_MISTAKE', 1)
 
 # Notion API設定
 HEADERS = {
@@ -103,7 +104,6 @@ class QuizApp:
         
         for row_idx, row in enumerate(buttons):
             # カラム数を動的に取得して中央揃えにする
-            col_count = len(row)
             frame = tk.Frame(btn_frame)
             frame.grid(row=row_idx, column=0, columnspan=4) # columnspanは最大ボタン数に合わせる
 
@@ -315,15 +315,15 @@ class QuizApp:
         
         return not failed_keys
 
-    def generate_problems(self, count=10, digits=3):
+    def generate_problems(self, count=10):
         """問題生成・実行"""
         self.questions = []
         i = 0
         
         while i < count:
             # 問題生成
-            X = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
-            Y = int(''.join([str(random.randint(1, 9)) for _ in range(digits)]))
+            X = int(''.join([str(random.randint(1, 9)) for _ in range(NUM_DIGITS)]))
+            Y = int(''.join([str(random.randint(1, 9)) for _ in range(NUM_DIGITS)]))
             # 余りは割る数より必ず小さく、0ではない
             R = random.randint(1, X - 1) if X > 1 else 0
             
@@ -337,19 +337,19 @@ class QuizApp:
             display_correct_answer = ""
 
             if QUESTION_TYPE == "掛け算":
-                Z = X * Y
+                correct_answer = X * Y
                 question = f"残り問題数：{count-i}問題: {X} × {Y} = ?"
                 user_answer_str = self.custom_keypad_dialog("掛け算問題", question)
                 user_answer = self.safe_int(user_answer_str)
                 
-                is_correct = (Z == user_answer) or DEBUG
+                is_correct = (correct_answer == user_answer) or DEBUG
                 
                 question_data.update({
                     'question': f'{X} × {Y}',
-                    'correct_answer': Z,
+                    'correct_answer': correct_answer,
                     'user_answer': user_answer,
                 })
-                display_correct_answer = Z
+                display_correct_answer = correct_answer
 
             elif QUESTION_TYPE == "割り算":
                 Z = X * Y + R
@@ -382,7 +382,10 @@ class QuizApp:
             
             if not is_correct:
                 result_msg += f"\n正解: {display_correct_answer}"
-            
+                if ADD_QUESTIONS_ON_MISTAKE > 0:
+                    count += ADD_QUESTIONS_ON_MISTAKE
+                    result_msg += f"\n({ADD_QUESTIONS_ON_MISTAKE}問追加されました)"
+
             messagebox.showinfo("結果", result_msg)
             
             question_data['time'] = elapsed_time
@@ -400,6 +403,8 @@ class QuizApp:
         if DEBUG:
             print("デバッグモード: 有効")
             print(f"問題種: {QUESTION_TYPE}")
+            print(f"桁数: {NUM_DIGITS}")
+            print(f"間違い時の追加問題数: {ADD_QUESTIONS_ON_MISTAKE}")
             print(f"ログファイル: {LOG_FILE}")
             print(f"Notion APIキー: {'*' * 8}")
             print(f"データベースID: {DATABASE_ID}")
