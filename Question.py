@@ -22,6 +22,8 @@ QUESTION_TYPE = config.get('TYPE', '掛け算')
 LOG_FILE = os.path.join(os.path.dirname(config_path), config.get('LOG_FILE', 'activity_log.json'))
 NUM_DIGITS = config.get('NUM_DIGITS', 3)
 ADD_QUESTIONS_ON_MISTAKE = config.get('ADD_QUESTIONS_ON_MISTAKE', 1)
+NUM_QUESTIONS = config.get('NUM_QUESTIONS', 10)
+MAX_QUESTIONS = config.get('MAX_QUESTIONS', 100)
 
 # Notion API設定
 HEADERS = {
@@ -315,7 +317,7 @@ class QuizApp:
         
         return not failed_keys
 
-    def generate_problems(self, count=10):
+    def generate_problems(self, count=NUM_QUESTIONS):
         """問題生成・実行"""
         self.questions = []
         i = 0
