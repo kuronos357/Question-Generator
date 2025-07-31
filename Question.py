@@ -400,13 +400,8 @@ class QuizApp:
         print("=== 計算問題アプリ開始 ===")
         if DEBUG:
             print("デバッグモード: 有効")
-            print(f"問題種: {QUESTION_TYPE}")
-            print(f"桁数: {NUM_DIGITS}")
-            print(f"間違い時の追加問題数: {ADD_QUESTIONS_ON_MISTAKE}")
-            print(f"ログファイル: {LOG_FILE}")
-            print(f"Notion APIキー: {'*' * 8}")
-            print(f"データベースID: {DATABASE_ID}")
-            print("設定ファイル:", config_path)
+            print(config)
+
         
         # 1. 問題実行
         session_key = self.generate_problems()
