@@ -329,7 +329,7 @@ class QuizApp:
             start_time = time.time()
             
             if DEBUG:
-                print(f"デバッグ: X={X}, Y={Y}, R={R}, 残り={count-i}, タイプ={QUESTION_TYPE}")
+                print(f"デバッグ: Z={Z},X={X}, Y={Y}, R={R}, 残り={count-i}, タイプ={QUESTION_TYPE}")
 
             is_correct = False
             question_data = {'type': QUESTION_TYPE}
