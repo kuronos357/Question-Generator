@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>計算問題アプリ</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>計算問題</h1>
+        <div id="quiz-area">
+            <p id="question">ここに問題が表示されます</p>
+            <div id="answer-form">
+                <input type="text" id="user-answer" placeholder="答えを入力" readonly>
+                <div id="keypad"></div>
+            </div>
+            <button id="submit-btn">回答</button>
+        </div>
+        <div id="result-area" style="display: none;">
+            <p id="result-message"></p>
+            <button id="next-btn">次の問題へ</button>
+        </div>
+        <div id="summary-area" style="display: none;">
+            <h2>結果サマリー</h2>
+            <p id="summary-text"></p>
+            <button id="restart-btn">もう一度挑戦</button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
