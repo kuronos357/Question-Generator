@@ -324,9 +324,8 @@ class QuizApp:
             # 問題生成
             X = int(''.join([str(random.randint(1, 9)) for _ in range(NUM_DIGITS)]))
             Y = int(''.join([str(random.randint(1, 9)) for _ in range(NUM_DIGITS)]))
-            # 余りは割る数より必ず小さく、0ではない
-            R = random.randint(1, X - 1) if X > 1 else 0
-            
+            R = random.randint(1, X - 1)
+            Z = X * Y + R
             start_time = time.time()
             
             if DEBUG:
@@ -337,22 +336,21 @@ class QuizApp:
             display_correct_answer = ""
 
             if QUESTION_TYPE == "掛け算":
-                correct_answer = X * Y
-                question = f"残り問題数：{count-i}問題: {X} × {Y} = ?"
+                question = f"残り問題数：{count-i}問題: {X} × {Y}+{R} = ?"
                 user_answer_str = self.custom_keypad_dialog("掛け算問題", question)
                 user_answer = self.safe_int(user_answer_str)
                 
-                is_correct = (correct_answer == user_answer)
+                is_correct = (Z == user_answer)
                 
                 question_data.update({
                     'question': f'{X} × {Y}',
-                    'correct_answer': correct_answer,
+                    'correct_answer': Z,
                     'user_answer': user_answer,
                 })
-                display_correct_answer = correct_answer
+                display_correct_answer = Z
 
             elif QUESTION_TYPE == "割り算":
-                Z = X * Y + R
+                
                 question = f"残り問題数：{count-i}問題: {Z} ÷ {X} = ? 余り ?"
                 user_input_str = self.custom_keypad_dialog("割り算問題", question, show_r_button=True)
                 
