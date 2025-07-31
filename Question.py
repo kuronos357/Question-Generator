@@ -96,12 +96,10 @@ class QuizApp:
             ('7', '8', '9'),
             ('4', '5', '6'),
             ('1', '2', '3'),
+            ('0', '⌫', 'OK')
         ]
         # 最後の行を動的に設定
-        last_row = ['0']
-        if show_r_button:
-            last_row.append('R')
-        last_row.extend(['⌫', 'OK'])
+        last_row = ['余り'] if show_r_button else []
         buttons.append(tuple(last_row))
         
         for row_idx, row in enumerate(buttons):
@@ -344,7 +342,7 @@ class QuizApp:
                 user_answer_str = self.custom_keypad_dialog("掛け算問題", question)
                 user_answer = self.safe_int(user_answer_str)
                 
-                is_correct = (correct_answer == user_answer) or DEBUG
+                is_correct = (correct_answer == user_answer)
                 
                 question_data.update({
                     'question': f'{X} × {Y}',
@@ -360,14 +358,14 @@ class QuizApp:
                 
                 user_quotient, user_remainder = 0, 0
                 if user_input_str:
-                    if 'R' in user_input_str:
-                        parts = user_input_str.split('R', 1)
+                    if '余り' in user_input_str:
+                        parts = user_input_str.split('余り', 1)
                         user_quotient = self.safe_int(parts[0])
                         user_remainder = self.safe_int(parts[1]) if len(parts) > 1 and parts[1] else 0
                     else:
                         user_quotient = self.safe_int(user_input_str)
 
-                is_correct = (Y == user_quotient and R == user_remainder) or DEBUG
+                is_correct = (Y == user_quotient and R == user_remainder)
 
                 question_data.update({
                     'question': f'{Z} ÷ {X}',
