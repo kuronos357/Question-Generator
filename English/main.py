@@ -9,7 +9,7 @@ class WordQuizApp:
         self.master.title("英単語学習アプリ")
         self.master.geometry("900x700")
 
-        self.file_path = '/home/kuronos357/programming/Project/Question-generator/English/英単語mk3.csv'
+        self.file_path = '/home/kuronos357/programming/Project/Question-generator/English/参照データ/英単語mk3.csv'
         self.load_data()
         self.current_index = 0
         self.todays_correct_count = 0
